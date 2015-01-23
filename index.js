@@ -94,6 +94,7 @@ env("<html></html>", function (errors, window) {
 function connect(port) {
   log("Connecting to '"+port+"'");
   var currentLine = "";
+  var exitCallback, exitTimeout;
   Espruino.Core.Serial.startListening(function(data) {
    currentLine += data;
    while (currentLine.indexOf("\n")>=0) {
@@ -101,6 +102,11 @@ function connect(port) {
      log(args.espruinoPrefix + currentLine.substr(0,i)+args.espruinoPostfix);
      currentLine = currentLine.substr(i+1);
    }
+   // if we're waiting to exit, make sure we wait until nothing has been printed
+   if (exitTimeout && exitCallback) {
+     clearTimeout(exitTimeout);
+     exitTimeout = setTimeout(exitCallback, 500);
+   }   
   });
   Espruino.Core.Serial.open(port, function() {
     log("Connected");
@@ -117,8 +123,8 @@ function connect(port) {
     // send code over here...
     if (code)
       Espruino.Core.CodeWriter.writeToEspruino(code, function() {
-        console.log("Finished.");
-        process.exit(0);
+        exitCallback = function() { process.exit(0); };
+        exitTimeout = setTimeout(exitCallback, 500);
       }); 
     //
     // ---------------------- 
