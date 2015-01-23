@@ -1,15 +1,24 @@
+/* 
+ espruino-tools
+ --------------
+
+ https://github.com/espruino/espruino-tools
+
+ Copyright 2015 Gordon Williams (gw@pur3.co.uk)
+
+ This Source Code is subject to the terms of the Mozilla Public
+ License, v2.0. If a copy of the MPL was not distributed with this
+ file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+*/
 var fs = require("fs");
+
 // override default console.log
 var log = console.log;
 console.log = function() {
   if (args.verbose)
     log.apply(console, arguments);
 }
-// logo
-log(
-  "espruino-tools\n"+
-  "--------------\n"+
-  "");
 // Parse Arguments
 var args = {};
 for (var i=2;i<process.argv.length;i++) {
@@ -20,6 +29,7 @@ for (var i=2;i<process.argv.length;i++) {
     else if (arg=="-v" || arg=="--verbose") args.verbose = true;
     else if (arg=="-q" || arg=="--quiet") args.quiet = true;
     else if (arg=="-c" || arg=="--color") args.color = true;
+    else if (arg=="-m" || arg=="--minify") args.minify = true;
     else if (arg=="-p" || arg=="--port") { i++; args.port = next; if (!next) throw new Error("Expecting a port argument"); }
     else if (arg=="-e") { i++; args.expr = next; if (!next) throw new Error("Expecting an expression argument"); }
     else throw new Error("Unknown Argument '"+arg+"', try --help");
@@ -29,6 +39,9 @@ for (var i=2;i<process.argv.length;i++) {
     args.file = arg;
   }
 }
+// if nothing, show help and exit
+if (process.argv.length==2) 
+  args.help = true;
 // Extra argument stuff
 args.espruinoPrefix = args.quiet?"":"--]";
 args.espruinoPostfix = "";
@@ -36,16 +49,32 @@ if (args.color) {
   args.espruinoPrefix = "\033[32m";
   args.espruinoPostfix = "\033[0m";
 }
+// this is called after Espruino tools are loaded, and
+// sets up configuration as requested by the command-line options
+function setupConfig(Espruino) {
+  if (args.minify) Espruino.Config.MINIFICATION_LEVEL = "SIMPLE_OPTIMIZATIONS";
+}
+
+// header
+if (!args.quiet) {
+  log(
+    "espruino-tools\n"+
+    "--------------\n"+
+    "");
+}
 
 // Help
 if (args.help) {
-  ["USAGE: ./espruinotool file_to_upload.js",
+  ["USAGE: ./espruinotool ...options... [file_to_upload.js]",
    "",
-   "  -h,--help               : show this message",
-   "  -v,--verbose            : verbose",
-   "  -q,--quiet              : quiet - apart from Espruino output",
-   "  -p,--port /dev/ttyX     : specify port to connect to",
-   "  -e command              : evaluate the given expression on Espruino",
+   "  -h,--help               : Show this message",
+   "  -v,--verbose            : Verbose",
+   "  -q,--quiet              : Quiet - apart from Espruino output",
+   "  -m,--minify             : Minify the code before sending it",
+   "  -p,--port /dev/ttyX     : Specify port to connect to",
+   "  -e command              : Evaluate the given expression on Espruino",
+   "                              If no file to upload is specified but you use -e,",
+   "                              Espruino will not be reset", 
    "",
    "Please report bugs via https://github.com/espruino/espruino-tools/issues",
    ""].
@@ -78,21 +107,42 @@ var env = require('jsdom').env;
 var $,document;
 var Espruino;
 
+try {
+  var acorn = require("acorn");
+  acorn.walk = require("acorn/util/walk");
+} catch(e) {
+  console.log("Acorn library not found - you'll need it for compiled code");
+}
+
 env("<html></html>", function (errors, window) {
-    $ = require('jquery')(window);    
-    document = window.document;
+  // Fixing up to fake web browser
+  $ = require('jquery')(window);        
+  XMLHttpRequest = require('xmlhttprequest').XMLHttpRequest;
+  $.support.cors = true;
+  $.ajaxSettings.xhr = function() {
+      return new XMLHttpRequest();
+  };
+  document = window.document;
 
-    // ---------------
-    //console.log(__dirname);
-    Espruino = loadJS(__dirname+"/EspruinoTools/espruino.js");
-    loadDir(__dirname+"/EspruinoTools/core");
-    loadDir(__dirname+"/EspruinoTools/plugins");
+  // ---------------
+  //console.log(__dirname);
+  loadDir(__dirname+"/EspruinoTools/libs");
+  Espruino = loadJS(__dirname+"/EspruinoTools/espruino.js");
+  loadDir(__dirname+"/EspruinoTools/core");
+  loadDir(__dirname+"/EspruinoTools/plugins");
 
-    $(main);
+  Espruino.Core.Notifications = {
+    success : function(e) { log(e); },
+    error : function(e) { console.error(e); },
+    warning : function(e) { console.warn(e); },
+    info : function(e) { console.log(e); }, 
+  };
+
+  $(main);
 });
 
 function connect(port) {
-  log("Connecting to '"+port+"'");
+  if (!args.quiet) log("Connecting to '"+port+"'");
   var currentLine = "";
   var exitCallback, exitTimeout;
   Espruino.Core.Serial.startListening(function(data) {
@@ -109,23 +159,28 @@ function connect(port) {
    }   
   });
   Espruino.Core.Serial.open(port, function() {
-    log("Connected");
+    if (!args.quiet) log("Connected");
     // figure out what code we need to send
     var code = "";
     if (args.file) {
       code = fs.readFileSync(args.file).toString();
     }
     if (args.expr) {  
-      if (code && code[code.length-1]!="\n")
-        code += "\n";
+      if (code) {
+        if (code[code.length-1]!="\n")
+          code += "\n";        
+      } else
+        Espruino.Config.RESET_BEFORE_SEND = false;
       code += args.expr+"\n";
     }
     // send code over here...
     if (code)
-      Espruino.Core.CodeWriter.writeToEspruino(code, function() {
-        exitCallback = function() { process.exit(0); };
-        exitTimeout = setTimeout(exitCallback, 500);
-      }); 
+      Espruino.callProcessor("transformForEspruino", code, function(code) {
+        Espruino.Core.CodeWriter.writeToEspruino(code, function() {
+          exitCallback = function() { process.exit(0); };
+          exitTimeout = setTimeout(exitCallback, 500);
+        }); 
+      });
     //
     // ---------------------- 
    }, function() {
@@ -134,6 +189,8 @@ function connect(port) {
 }
 
 function main() {
+  setupConfig(Espruino);
+
   if (Espruino.Core.Serial === undefined) {
     console.error("No serial driver found");
     return;
