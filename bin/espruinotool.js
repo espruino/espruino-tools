@@ -1,3 +1,3 @@
 #!/usr/bin/env node
 
-var espruinotool = require('../');
+var espruinotool = require('../index.js');
