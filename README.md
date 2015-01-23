@@ -15,7 +15,7 @@ This is an attempt to use the [EspruinoTools](https://github.com/espruino/Esprui
 
 ### Getting Started
 
-This expects the (https://github.com/espruino/EspruinoTools)[EspruinoTools] repository to be in `espruino-tools/EspruinoTools`. If you're using Git, make sure you add it using the command:
+This expects the [EspruinoTools](https://github.com/espruino/EspruinoTools) repository to be in `espruino-tools/EspruinoTools`. If you're using Git, make sure you add it using the command:
 
 ```
 git submodule add git@github.com:espruino/EspruinoTools.git
