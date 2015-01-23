@@ -64,9 +64,12 @@ function main() {
       });
       Espruino.Core.Serial.open(ports[0], function() {
         console.log("Connected");
+        // send code over here...
+        Espruino.Core.CodeWriter.writeToEspruino("digitalWrite(LED1,1);\n"); 
+        // ---------------------- 
       }, function() {
         console.log("Disconnected");
       });
-    }
+   }
   });
 }
