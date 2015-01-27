@@ -23,7 +23,9 @@ console.log = function() {
 var args = {
   ports: []
 };
-var prev = "";
+var isNextInvalid = function(next) {
+  return !next || next.indexOf("-") !== -1 || next.indexOf(".js") !== -1;
+}
 for (var i=2;i<process.argv.length;i++) {
   var arg = process.argv[i];
   var next = process.argv[i+1];
@@ -36,22 +38,21 @@ for (var i=2;i<process.argv.length;i++) {
     else if (arg=="-p" || arg=="--port") { 
       args.ports.push(next); 
       var j = (++i) + 1;
-      while (process.argv[j] !== undefined && process.argv[j].indexOf("-") === -1) {
+      while (!isNextInvalid(process.argv[j])) {
         args.ports.push(process.argv[j++]);
         i++;
       }
-      if (!next || next.indexOf("-") !== -1) throw new Error("Expecting a port argument to -p, --port"); 
+      if (isNextInvalid(next)) throw new Error("Expecting a port argument to -p, --port"); 
     }
     else if (arg=="-e") { 
       i++; args.expr = next; 
-      if (!next || next.indexOf("-") !== -1) throw new Error("Expecting an expression argument to -e"); }
+      if (isNextInvalid(next)) throw new Error("Expecting an expression argument to -e"); }
     else throw new Error("Unknown Argument '"+arg+"', try --help");
   } else {
     if ("file" in args)
       throw new Error("File already specified as '"+args.file+"'");
     args.file = arg;
   }
-  prev = next;
 }
 // if nothing, show help and exit
 if (process.argv.length==2) 
