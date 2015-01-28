@@ -43,11 +43,13 @@ for (var i=2;i<process.argv.length;i++) {
         i++;
       }
       if (isNextInvalid(next)) throw new Error("Expecting a port argument to -p, --port"); 
-    }
-    else if (arg=="-e") { 
+    } else if (arg=="-e") { 
       i++; args.expr = next; 
-      if (isNextInvalid(next)) throw new Error("Expecting an expression argument to -e"); }
-    else throw new Error("Unknown Argument '"+arg+"', try --help");
+      if (isNextInvalid(next)) throw new Error("Expecting an expression argument to -e"); 
+    } else if (arg=="-f") { 
+      i++; args.updateFirmware = next; 
+      if (isNextInvalid(next)) throw new Error("Expecting a filename argument to -f"); 
+    } else throw new Error("Unknown Argument '"+arg+"', try --help");
   } else {
     if ("file" in args)
       throw new Error("File already specified as '"+args.file+"'");
@@ -87,6 +89,8 @@ if (args.help) {
    "  -q,--quiet              : Quiet - apart from Espruino output",
    "  -m,--minify             : Minify the code before sending it",
    "  -p,--port /dev/ttyX     : Specify port(s) to connect to",
+   "  -f firmware.bin         : Update Espruino's firmware to the given file (NOT WORKING)",
+   "                              Espruino must be in bootloader mode",
    "  -e command              : Evaluate the given expression on Espruino",
    "                              If no file to upload is specified but you use -e,",
    "                              Espruino will not be reset", 
@@ -187,6 +191,14 @@ function connect(port, exitCallback) {
       } else
         Espruino.Config.RESET_BEFORE_SEND = false;
       code += args.expr+"\n";
+    }
+    // Do we need to update firmware?
+    if (args.updateFirmware) {
+      if (code) throw new Error("Can't update firmware *and* upload code right now.");
+      Espruino.Core.Flasher.flashBinaryToDevice(fs.readFileSync(args.updateFirmware).toString(), function(err) {
+        log(err ? "Error!" : "Success!");
+        exitTimeout = setTimeout(exitCallback, 500);
+      });
     }
     // send code over here...
     if (code)
