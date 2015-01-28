@@ -7,6 +7,9 @@ Node module to allow command-line access to Espruino. It can be used as follows:
 # Load a file into Espruino
 ./espruinotool -p /dev/ttyACM1 mycode.js
 
+# Load a file into two Espruino boards
+./espruinotool -p /dev/ttyACM1 /dev/ttyACM2 mycode.js
+
 # Load a file into Espruino and save
 ./espruinotool -p /dev/ttyACM1 mycode.js -e "save()"
 

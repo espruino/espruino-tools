@@ -20,7 +20,12 @@ console.log = function() {
     log.apply(console, arguments);
 }
 // Parse Arguments
-var args = {};
+var args = {
+  ports: []
+};
+var isNextInvalid = function(next) {
+  return !next || next.indexOf("-") !== -1 || next.indexOf(".js") !== -1;
+}
 for (var i=2;i<process.argv.length;i++) {
   var arg = process.argv[i];
   var next = process.argv[i+1];
@@ -30,8 +35,18 @@ for (var i=2;i<process.argv.length;i++) {
     else if (arg=="-q" || arg=="--quiet") args.quiet = true;
     else if (arg=="-c" || arg=="--color") args.color = true;
     else if (arg=="-m" || arg=="--minify") args.minify = true;
-    else if (arg=="-p" || arg=="--port") { i++; args.port = next; if (!next) throw new Error("Expecting a port argument"); }
-    else if (arg=="-e") { i++; args.expr = next; if (!next) throw new Error("Expecting an expression argument"); }
+    else if (arg=="-p" || arg=="--port") { 
+      args.ports.push(next); 
+      var j = (++i) + 1;
+      while (!isNextInvalid(process.argv[j])) {
+        args.ports.push(process.argv[j++]);
+        i++;
+      }
+      if (isNextInvalid(next)) throw new Error("Expecting a port argument to -p, --port"); 
+    }
+    else if (arg=="-e") { 
+      i++; args.expr = next; 
+      if (isNextInvalid(next)) throw new Error("Expecting an expression argument to -e"); }
     else throw new Error("Unknown Argument '"+arg+"', try --help");
   } else {
     if ("file" in args)
@@ -71,7 +86,7 @@ if (args.help) {
    "  -v,--verbose            : Verbose",
    "  -q,--quiet              : Quiet - apart from Espruino output",
    "  -m,--minify             : Minify the code before sending it",
-   "  -p,--port /dev/ttyX     : Specify port to connect to",
+   "  -p,--port /dev/ttyX     : Specify port(s) to connect to",
    "  -e command              : Evaluate the given expression on Espruino",
    "                              If no file to upload is specified but you use -e,",
    "                              Espruino will not be reset", 
@@ -141,7 +156,7 @@ env("<html></html>", function (errors, window) {
   $(main);
 });
 
-function connect(port) {
+function connect(port, exitCallback) {
   if (!args.quiet) log("Connecting to '"+port+"'");
   var currentLine = "";
   var exitCallback, exitTimeout;
@@ -177,7 +192,6 @@ function connect(port) {
     if (code)
       Espruino.callProcessor("transformForEspruino", code, function(code) {
         Espruino.Core.CodeWriter.writeToEspruino(code, function() {
-          exitCallback = function() { process.exit(0); };
           exitTimeout = setTimeout(exitCallback, 500);
         }); 
       });
@@ -195,14 +209,24 @@ function main() {
     console.error("No serial driver found");
     return;
   }
-  if (args.port) {
-    connect(args.port);
+  if (args.ports.length > 0) {
+    //closure for stepping through each port 
+    //and connect + upload (use timout callback [iterate] for proceeding)
+    (function (ports, connect) {
+      this.ports = ports;
+      this.idx = 0;
+      this.connect = connect;
+      this.iterate = function() {
+        (idx>=ports.length?process.exit(0):connect(ports[idx++],iterate));
+      }
+      iterate();
+    })(args.ports, connect); 
   } else {    
     log("Searching for serial ports...");
     Espruino.Core.Serial.getPorts(function(ports) {
       console.log(ports);
       if (ports.length>0) 
-        connect(ports[0]);
+        connect(ports[0], function() { process.exit(0); });
       else
         throw new Error("No Ports Found");        
     });
