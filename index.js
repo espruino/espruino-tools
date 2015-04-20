@@ -55,11 +55,10 @@ else
   throw new Error("Expecting a port argument to -p, --port")
 
 // Non-option arguments, take the first one as file or display help
-if(!args.args.length)
+if(!args.args.length && !args.expr)
   args.help();
 else
-  args.file = args.args[0];
-  console.log(args.updateFirmware)
+  args.file = args.args[0] || false;
 
 // Extra argument stuff
 args.espruinoPrefix = args.quiet?"":"--]";
