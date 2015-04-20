@@ -11,7 +11,28 @@
  file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 */
-var fs = require("fs");
+var fs = require("fs"),
+    args = require("commander");
+
+// Parse Arguments
+args
+  .version('0.0.1')
+  .arguments('[file_to_upload.js]')
+  .option("-v, --verbose", "Verbose")
+  .option("-q, --quiet", "Quiet - apart from Espruino output")
+  .option("-m, --minify", "Minify the code before sending it")
+  .option("-c, --color", "Add color to Espruino output")
+  .option("-p, --port <port>", "Specify port(s) to connect to", function(val){
+    return val.split(',');
+  })
+  .option("-f, --update-firmware <file>", "Update Espruino's firmware to the given file (NOT WORKING).\nEspruino must be in bootloader mode")
+  .option("-e, --expr <expression>", "Evaluate the given expression on Espruino\nIf no file to upload is specified but you use -e,\nEspruino will not be reset");
+
+args.on('--help', function(){
+  console.log("  Please report bugs via https://github.com/espruino/espruino-tools/issues\n");
+});
+
+args.parse(process.argv);
 
 // override default console.log
 var log = console.log;
@@ -19,46 +40,27 @@ console.log = function() {
   if (args.verbose)
     log.apply(console, arguments);
 }
-// Parse Arguments
-var args = {
-  ports: []
-};
-var isNextInvalid = function(next) {
-  return !next || next.indexOf("-") !== -1 || next.indexOf(".js") !== -1;
-}
-for (var i=2;i<process.argv.length;i++) {
-  var arg = process.argv[i];
-  var next = process.argv[i+1];
-  if (arg[0]=="-") {
-    if (arg=="-h" || arg=="--help") args.help = true;
-    else if (arg=="-v" || arg=="--verbose") args.verbose = true;
-    else if (arg=="-q" || arg=="--quiet") args.quiet = true;
-    else if (arg=="-c" || arg=="--color") args.color = true;
-    else if (arg=="-m" || arg=="--minify") args.minify = true;
-    else if (arg=="-p" || arg=="--port") { 
-      args.ports.push(next); 
-      var j = (++i) + 1;
-      while (!isNextInvalid(process.argv[j])) {
-        args.ports.push(process.argv[j++]);
-        i++;
-      }
-      if (isNextInvalid(next)) throw new Error("Expecting a port argument to -p, --port"); 
-    } else if (arg=="-e") { 
-      i++; args.expr = next; 
-      if (isNextInvalid(next)) throw new Error("Expecting an expression argument to -e"); 
-    } else if (arg=="-f") { 
-      i++; args.updateFirmware = next; 
-      if (isNextInvalid(next)) throw new Error("Expecting a filename argument to -f"); 
-    } else throw new Error("Unknown Argument '"+arg+"', try --help");
-  } else {
-    if ("file" in args)
-      throw new Error("File already specified as '"+args.file+"'");
-    args.file = arg;
-  }
-}
-// if nothing, show help and exit
-if (process.argv.length==2) 
-  args.help = true;
+
+// Checking for options that require arguments. If just a option flag is passed, it will be parsed as Boolean(true)
+
+if(args.expr === true)
+  throw new Error("Expecting an expression argument to -e")
+
+if(args.firmware === true)
+  throw new Error("Expecting a filename argument to -f")
+
+if(args.port !== true)
+  args.ports = args.port
+else
+  throw new Error("Expecting a port argument to -p, --port")
+
+// Non-option arguments, take the first one as file or display help
+if(!args.args.length)
+  args.help();
+else
+  args.file = args.args[0];
+  console.log(args.updateFirmware)
+
 // Extra argument stuff
 args.espruinoPrefix = args.quiet?"":"--]";
 args.espruinoPostfix = "";
@@ -66,6 +68,7 @@ if (args.color) {
   args.espruinoPrefix = "\033[32m";
   args.espruinoPostfix = "\033[0m";
 }
+
 // this is called after Espruino tools are loaded, and
 // sets up configuration as requested by the command-line options
 function setupConfig(Espruino) {
@@ -80,28 +83,6 @@ if (!args.quiet) {
     "");
 }
 
-// Help
-if (args.help) {
-  ["USAGE: ./espruinotool ...options... [file_to_upload.js]",
-   "",
-   "  -h,--help               : Show this message",
-   "  -v,--verbose            : Verbose",
-   "  -q,--quiet              : Quiet - apart from Espruino output",
-   "  -m,--minify             : Minify the code before sending it",
-   "  -p,--port /dev/ttyX     : Specify port(s) to connect to",
-   "  -f firmware.bin         : Update Espruino's firmware to the given file (NOT WORKING)",
-   "                              Espruino must be in bootloader mode",
-   "  -e command              : Evaluate the given expression on Espruino",
-   "                              If no file to upload is specified but you use -e,",
-   "                              Espruino will not be reset", 
-   "",
-   "Please report bugs via https://github.com/espruino/espruino-tools/issues",
-   ""].
-    forEach(function(l) {log(l);});  
-  process.exit(1);
-}
-
-
 /* load all files in EspruinoTools... we do this so we can still
 use these files normally in the Web IDE */
 function loadJS(filePath) {
@@ -109,6 +90,7 @@ function loadJS(filePath) {
   var contents = fs.readFileSync(filePath).toString();
   return eval(contents);
 }
+
 function loadDir(dir) {
   var files = fs.readdirSync(dir);
   for (var i in files) {
