@@ -11,12 +11,11 @@
     "url": "https://github.com/espruino/espruino-tools"
   },
   "dependencies": {
-    "acorn": "~0.6.0",
-    "commander": "~2.8.0",
-    "jquery": "~2.1.1",
-    "jsdom": "~1.0.0",
     "serialport": "~1.2.5",
-    "xmlhttprequest": "~1.7.0"
+    "jquery": "~2.1.1",
+    "jsdom":"~1.0.0",
+    "xmlhttprequest":"~1.7.0",
+    "acorn":"~0.6.0"
   },
   "keywords": [
     "espruino"
