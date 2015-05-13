@@ -89,7 +89,7 @@ if (args.help) {
    "  -q,--quiet              : Quiet - apart from Espruino output",
    "  -m,--minify             : Minify the code before sending it",
    "  -p,--port /dev/ttyX     : Specify port(s) to connect to",
-   "  -f firmware.bin         : Update Espruino's firmware to the given file (NOT WORKING)",
+   "  -f firmware.bin         : Update Espruino's firmware to the given file",
    "                              Espruino must be in bootloader mode",
    "  -e command              : Evaluate the given expression on Espruino",
    "                              If no file to upload is specified but you use -e,",
@@ -106,7 +106,7 @@ if (args.help) {
 use these files normally in the Web IDE */
 function loadJS(filePath) {
   console.log("Found "+filePath);
-  var contents = fs.readFileSync(filePath).toString();
+  var contents = fs.readFileSync(filePath, {encoding:"utf8"});
   return eval(contents);
 }
 function loadDir(dir) {
@@ -182,7 +182,7 @@ function connect(port, exitCallback) {
     // figure out what code we need to send
     var code = "";
     if (args.file) {
-      code = fs.readFileSync(args.file).toString();
+      code = fs.readFileSync(args.file, {encoding:"utf8"});
     }
     if (args.expr) {  
       if (code) {
@@ -195,7 +195,7 @@ function connect(port, exitCallback) {
     // Do we need to update firmware?
     if (args.updateFirmware) {
       if (code) throw new Error("Can't update firmware *and* upload code right now.");
-      Espruino.Core.Flasher.flashBinaryToDevice(fs.readFileSync(args.updateFirmware).toString(), function(err) {
+      Espruino.Core.Flasher.flashBinaryToDevice(fs.readFileSync(args.updateFirmware, {encoding:"binary"}), function(err) {
         log(err ? "Error!" : "Success!");
         exitTimeout = setTimeout(exitCallback, 500);
       });
