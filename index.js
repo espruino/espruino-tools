@@ -163,8 +163,11 @@ env("<html></html>", function (errors, window) {
 function connect(port, exitCallback) {
   if (!args.quiet) log("Connecting to '"+port+"'");
   var currentLine = "";
-  var exitCallback, exitTimeout;
+  var exitTimeout;
   Espruino.Core.Serial.startListening(function(data) {
+   // convert ArrayBuffer to string
+   data = String.fromCharCode.apply(null, new Uint8Array(data));
+   // Now handle...
    currentLine += data;
    while (currentLine.indexOf("\n")>=0) {
      var i = currentLine.indexOf("\n");
@@ -223,7 +226,7 @@ function main() {
   }
   if (args.ports.length > 0) {
     //closure for stepping through each port 
-    //and connect + upload (use timout callback [iterate] for proceeding)
+    //and connect + upload (use timeout callback [iterate] for proceeding)
     (function (ports, connect) {
       this.ports = ports;
       this.idx = 0;
